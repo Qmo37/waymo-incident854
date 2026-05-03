@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="zh-Hant">
+    <head>
+        <meta charset="UTF-8" />
+        <title>當 AI 選擇停下來｜Waymo Incident #854</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700;900&family=Noto+Sans+TC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            :root {
+                --paper: #efe9da;
+                --paper-dim: #e6dfcd;
+                --ink: #161410;
+                --ink-soft: #34302a;
+                --rule: #c4baa3;
+                --muted: #7a7264;
+                --accent: #b03028;
+                --signal: #c79121;
+                --serif:
+                    "Noto Serif TC", "Source Han Serif TC", "Songti TC", serif;
+                --sans: "Noto Sans TC", "PingFang TC", sans-serif;
+                --mono: "JetBrains Mono", "SF Mono", monospace;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            em,
+            i,
+            cite {
+                font-style: normal;
+            }
+
+            html,
+            body {
+                background: #1a1815;
+                height: 100%;
+                overflow: hidden;
+                font-family: var(--sans);
+                color: var(--ink);
+            }
+
+            /* === FIXED 1920x1080 STAGE === */
+            .stage {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                width: 1920px;
+                height: 1080px;
+                transform: translate(-50%, -50%) scale(var(--s, 1));
+                transform-origin: center center;
+                background: var(--paper);
+            }
+
+            .slide {
+                position: absolute;
+                inset: 0;
+                display: none;
+                padding: 80px 120px;
+                flex-direction: column;
+                background: var(--paper);
+                overflow: hidden;
+            }
+
+            .slide.active {
+                display: flex;
+                animation: fadein 0.5s ease-out;
+            }
+
+            @keyframes fadein {
+                from {
+                    opacity: 0;
+                }
+                to {
+                    opacity: 1;
+                }
+            }
+
+            @keyframes drawline {
+                from {
+                    stroke-dashoffset: 800;
+                }
+                to {
+                    stroke-dashoffset: 0;
+                }
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 0.5;
+                }
+                50% {
+                    opacity: 1;
+                }
+            }
+
+            /* === HEADER STRIP === */
+            .head-strip {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-family: var(--mono);
+                font-size: 20px;
+                color: var(--muted);
+                letter-spacing: 0.12em;
+                padding-bottom: 18px;
+                border-bottom: 1px solid var(--rule);
+                margin-bottom: 56px;
+            }
+
+            .head-strip .case-id {
+                color: var(--accent);
+                font-weight: 500;
+            }
+            .head-strip .pager span {
+                color: var(--ink);
+                font-weight: 500;
+            }
+
+            /* === TYPOGRAPHY === */
+            h1.hero {
+                font-family: var(--serif);
+                font-weight: 900;
+                font-size: 156px;
+                line-height: 0.98;
+                letter-spacing: -0.04em;
+                color: var(--ink);
+            }
+
+            h2.title {
+                font-family: var(--serif);
+                font-weight: 700;
+                font-size: 84px;
+                line-height: 1.08;
+                letter-spacing: -0.02em;
+                color: var(--ink);
+                margin-bottom: 48px;
+            }
+
+            h2.title .accent {
+                color: var(--accent);
+            }
+            h2.title em {
+                color: var(--accent);
+                font-weight: 800;
+            }
+
+            .kicker {
+                font-family: var(--serif);
+                font-size: 34px;
+                color: var(--muted);
+                margin-bottom: 28px;
+                font-weight: 500;
+            }
+
+            .lead {
+                font-family: var(--serif);
+                font-size: 34px;
+                line-height: 1.55;
+                color: var(--ink-soft);
+                font-weight: 500;
+            }
+
+            .body {
+                font-family: var(--sans);
+                font-size: 28px;
+                line-height: 1.7;
+                color: var(--ink-soft);
+            }
+
+            .caption {
+                font-family: var(--mono);
+                font-size: 18px;
+                letter-spacing: 0.12em;
+                color: var(--muted);
+            }
+
+            /* ============ SLIDE 1 — COVER ============ */
+            .cover {
+                background: var(--paper);
+                color: var(--paper);
+                padding: 0;
+                position: relative;
+            }
+
+            .cover-hero {
+                position: relative;
+                background: var(--ink);
+                flex: 1;
+                padding: 72px 120px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .cover-grid-bg {
+                position: absolute;
+                inset: 0;
+                background-image:
+                    linear-gradient(
+                        rgba(176, 48, 40, 0.06) 1px,
+                        transparent 1px
+                    ),
+                    linear-gradient(
+                        90deg,
+                        rgba(176, 48, 40, 0.06) 1px,
+                        transparent 1px
+                    );
+                background-size: 80px 80px;
+                pointer-events: none;
+            }
+
+            .cover-content {
+                position: relative;
+                z-index: 2;
+                flex: 1;
+                width: 100%;
+                display: grid;
+                grid-template-rows: auto 1fr;
+                gap: 48px;
+            }
+
+            .cover-top {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                font-family: var(--mono);
+                font-size: 22px;
+                letter-spacing: 0.18em;
+                color: var(--accent);
+                text-transform: uppercase;
+                font-weight: 600;
+            }
+
+            .cover-top .right {
+                text-align: right;
+                color: rgba(239, 233, 218, 0.6);
+            }
+
+            .cover-top .right .label {
+                display: block;
+                font-size: 18px;
+                opacity: 0.65;
+                margin-bottom: 6px;
+            }
+
+            .cover-main {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            .cover-main h1 {
+                font-family: var(--serif);
+                font-weight: 900;
+                font-size: 200px;
+                line-height: 0.95;
+                letter-spacing: -0.05em;
+                color: var(--paper);
+            }
+
+            .cover-main h1 .stop {
+                color: var(--accent);
+                display: inline-block;
+                position: relative;
+            }
+
+            .cover-main h1 .stop::after {
+                content: "";
+                position: absolute;
+                left: 0;
+                bottom: -8px;
+                width: 100%;
+                height: 6px;
+                background: var(--accent);
+            }
+
+            .cover-sub {
+                font-family: var(--serif);
+                font-size: 40px;
+                font-weight: 500;
+                line-height: 1.5;
+                color: rgba(239, 233, 218, 0.85);
+                margin-top: 40px;
+                max-width: 1300px;
+            }
+
+            .cover-sub strong {
+                color: var(--paper);
+                font-weight: 800;
+            }
+
+            .cover-info {
+                background: var(--paper);
+                color: var(--ink);
+                padding: 44px 120px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 80px;
+                border-top: 4px solid var(--accent);
+                flex-shrink: 0;
+            }
+
+            .cover-info .col {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .cover-info .col .lab {
+                font-family: var(--mono);
+                font-size: 18px;
+                letter-spacing: 0.22em;
+                color: var(--accent);
+                font-weight: 700;
+                text-transform: uppercase;
+            }
+
+            .cover-info .col .val {
+                font-family: var(--serif);
+                font-size: 30px;
+                color: var(--ink);
+                font-weight: 600;
+                line-height: 1.3;
+            }
+
+            .cover-info .col .val.placeholder {
+                color: var(--muted);
+                font-weight: 500;
+            }
+
+            .cover-svg {
+                position: absolute;
+                top: 50%;
+                right: 120px;
+                width: 320px;
+                height: 320px;
+                opacity: 0.85;
+                transform: translateY(-50%);
+            }
+
+            /* ============ SLIDE 2 — DATE OPENER ============ */
+            .date-display {
+                font-family: var(--serif);
+                font-weight: 900;
+                font-size: 144px;
+                line-height: 1;
+                letter-spacing: -0.03em;
+                color: var(--ink);
+                margin-bottom: 24px;
+            }
+
+            .date-display .yr {
+                color: var(--ink);
+            }
+            .date-display .sep {
+                color: var(--accent);
+                margin: 0 24px;
+                font-weight: 400;
+            }
+            .date-display .time {
+                color: var(--accent);
+                font-style: italic;
+                font-family: var(--serif);
+            }
+
+            .date-place {
+                font-family: var(--serif);
+                font-size: 44px;
+                font-weight: 500;
+                color: var(--muted);
+                margin-bottom: 100px;
+            }
+
+            .scene-facts {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 64px;
+                border-top: 2px solid var(--ink);
+                padding-top: 36px;
+                margin-bottom: 64px;
+            }
+
+            .scene-facts .fact .lab {
+                font-family: var(--mono);
+                font-size: 16px;
+                letter-spacing: 0.25em;
+                color: var(--accent);
+                margin-bottom: 14px;
+                text-transform: uppercase;
+            }
+
+            .scene-facts .fact .val {
+                font-family: var(--serif);
+                font-size: 34px;
+                font-weight: 700;
+                color: var(--ink);
+                line-height: 1.3;
+                margin-bottom: 8px;
+            }
+
+            .scene-facts .fact .det {
+                font-family: var(--sans);
+                font-size: 24px;
+                color: var(--muted);
+                line-height: 1.55;
+                font-weight: 500;
+            }
+
+            .scene-coda {
+                font-family: var(--serif);
+                font-size: 36px;
+                color: var(--ink-soft);
+                line-height: 1.6;
+                padding-top: 36px;
+                border-top: 1px solid var(--rule);
+                max-width: 1600px;
+                font-weight: 500;
+            }
+
+            .scene-coda strong {
+                color: var(--accent);
+                font-weight: 800;
+                font-size: 42px;
+            }
+
+            /* ============ SLIDE 3 — TIMELINE ============ */
+            .timeline-flow {
+                display: flex;
+                flex-direction: column;
+                gap: 36px;
+                margin-top: 16px;
+                position: relative;
+                margin-bottom: 64px;
+            }
+
+            .timeline-flow::before {
+                content: "";
+                position: absolute;
+                left: 158px;
+                top: 24px;
+                bottom: 24px;
+                width: 2px;
+                background: var(--rule);
+            }
+
+            .tl-item {
+                display: flex;
+                gap: 56px;
+                align-items: flex-start;
+            }
+
+            .tl-time {
+                font-family: var(--mono);
+                font-size: 24px;
+                font-weight: 600;
+                color: var(--accent);
+                width: 140px;
+                flex-shrink: 0;
+                padding-top: 4px;
+                letter-spacing: 0.05em;
+            }
+
+            .tl-mark {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                background: var(--paper);
+                border: 3px solid var(--accent);
+                flex-shrink: 0;
+                margin-top: 8px;
+                position: relative;
+                z-index: 1;
+            }
+
+            .tl-text {
+                flex: 1;
+                font-family: var(--serif);
+                font-size: 32px;
+                line-height: 1.5;
+                color: var(--ink);
+                font-weight: 600;
+            }
+
+            .tl-text .note {
+                display: block;
+                margin-top: 10px;
+                font-family: var(--sans);
+                font-size: 26px;
+                color: var(--muted);
+                font-weight: 500;
+                line-height: 1.5;
+            }
+
+            /* ============ PULL QUOTE ============ */
+            .pullquote {
+                background: var(--ink);
+                color: var(--paper);
+                padding: 48px 72px;
+                position: relative;
+                border-left: 6px solid var(--signal);
+            }
+
+            .pullquote .qmark {
+                position: absolute;
+                top: 12px;
+                left: 32px;
+                font-family: var(--serif);
+                font-size: 120px;
+                color: var(--signal);
+                line-height: 1;
+            }
+
+            .pullquote .text {
+                font-family: var(--serif);
+                font-size: 34px;
+                line-height: 1.6;
+                padding-left: 56px;
+                font-weight: 500;
+            }
+
+            .pullquote .text strong {
+                color: var(--signal);
+                font-weight: 700;
+            }
+
+            .pullquote .attr {
+                margin-top: 18px;
+                padding-left: 56px;
+                font-family: var(--mono);
+                font-size: 18px;
+                color: rgba(239, 233, 218, 0.7);
+                letter-spacing: 0.12em;
+            }
+
+            /* ============ SLIDE 4 — ESCALATION ============ */
+            .prose-block {
+                font-family: var(--serif);
+                font-size: 32px;
+                line-height: 1.7;
+                color: var(--ink);
+                font-weight: 500;
+                max-width: 1500px;
+                margin-bottom: 48px;
+            }
+
+            .prose-block p {
+                margin-bottom: 24px;
+            }
+            .prose-block p:last-child {
+                margin-bottom: 0;
+            }
+            .prose-block .em {
+                color: var(--accent);
+                font-weight: 700;
+                font-size: 36px;
+            }
+            .prose-block strong {
+                color: var(--ink);
+                font-weight: 800;
+                font-size: 36px;
+            }
+
+            /* ============ SLIDE 5 — CAR DID ============ */
+            .car-did {
+                display: grid;
+                grid-template-columns: 520px 1fr;
+                gap: 96px;
+                align-items: center;
+                flex: 1;
+                margin-bottom: 32px;
+            }
+
+            .screen-mock {
+                width: 520px;
+                aspect-ratio: 4 / 3;
+                background: linear-gradient(180deg, #0a0908 0%, #161410 100%);
+                border: 6px solid #000;
+                border-radius: 8px;
+                padding: 56px 40px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                position: relative;
+                box-shadow:
+                    0 30px 80px rgba(0, 0, 0, 0.18),
+                    inset 0 0 60px rgba(199, 145, 33, 0.04);
+            }
+
+            .screen-mock::before {
+                content: "WAYMO ONE";
+                position: absolute;
+                top: 18px;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-family: var(--mono);
+                font-size: 13px;
+                letter-spacing: 0.4em;
+                color: var(--signal);
+                opacity: 0.7;
+            }
+
+            .screen-mock .pulse {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--signal);
+                margin-bottom: 36px;
+                animation: pulse 2.4s ease-in-out infinite;
+            }
+
+            .screen-mock .msg {
+                font-family: var(--serif);
+                font-style: italic;
+                font-size: 40px;
+                line-height: 1.3;
+                color: var(--paper);
+                text-align: center;
+                font-weight: 400;
+            }
+
+            .screen-mock .sub {
+                margin-top: 24px;
+                font-family: var(--mono);
+                font-size: 13px;
+                color: rgba(199, 145, 33, 0.55);
+                letter-spacing: 0.25em;
+            }
+
+            .action-list {
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .action-row {
+                display: flex;
+                align-items: flex-start;
+                gap: 28px;
+                padding: 22px 28px;
+                background: var(--paper-dim);
+                border-left: 4px solid #4a7c59;
+            }
+
+            .action-row .check {
+                font-family: var(--serif);
+                color: #4a7c59;
+                font-size: 32px;
+                font-weight: 700;
+                line-height: 1.4;
+                flex-shrink: 0;
+            }
+
+            .action-row .text {
+                font-family: var(--serif);
+                font-size: 28px;
+                line-height: 1.5;
+                color: var(--ink);
+                font-weight: 500;
+            }
+
+            .action-row .text strong {
+                color: var(--ink);
+                font-weight: 800;
+            }
+
+            /* ============ SLIDE 6 — CAR DIDN'T ============ */
+            .didnt-list {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 24px 56px;
+                margin-bottom: 56px;
+            }
+
+            .didnt-row {
+                display: flex;
+                align-items: baseline;
+                gap: 24px;
+                padding: 20px 0;
+                border-bottom: 1px solid var(--rule);
+            }
+
+            .didnt-row .x {
+                font-family: var(--serif);
+                color: var(--accent);
+                font-size: 36px;
+                font-weight: 900;
+                line-height: 1;
+                flex-shrink: 0;
+            }
+
+            .didnt-row .text {
+                font-family: var(--serif);
+                font-size: 32px;
+                color: var(--ink);
+                line-height: 1.4;
+                font-weight: 600;
+            }
+
+            .bottom-quote {
+                padding: 44px 32px 32px;
+                border-top: 3px solid var(--ink);
+                font-family: var(--serif);
+                font-size: 48px;
+                font-weight: 800;
+                color: var(--ink);
+                line-height: 1.4;
+                text-align: center;
+                letter-spacing: -0.01em;
+            }
+
+            .bottom-quote .accent {
+                color: var(--accent);
+            }
+
+            /* ============ SLIDE 7 — AMINA VOICE ============ */
+            .amina-pull {
+                background: var(--ink);
+                color: var(--paper);
+                padding: 64px 80px;
+                margin-bottom: 48px;
+                border-left: 8px solid var(--signal);
+                position: relative;
+            }
+
+            .amina-pull .siren {
+                font-family: var(--mono);
+                font-size: 22px;
+                letter-spacing: 0.4em;
+                color: var(--accent);
+                margin-bottom: 24px;
+                font-weight: 600;
+            }
+
+            .amina-pull .text {
+                font-family: var(--serif);
+                font-size: 42px;
+                line-height: 1.6;
+                font-weight: 500;
+            }
+
+            .amina-pull .attr {
+                margin-top: 28px;
+                font-family: var(--mono);
+                font-size: 18px;
+                color: rgba(239, 233, 218, 0.7);
+                letter-spacing: 0.15em;
+            }
+
+            .amina-after {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 56px;
+                align-items: center;
+                padding-top: 32px;
+                border-top: 1px solid var(--rule);
+            }
+
+            .amina-after .text {
+                font-family: var(--serif);
+                font-size: 32px;
+                line-height: 1.55;
+                color: var(--ink-soft);
+                font-weight: 500;
+            }
+
+            .amina-after .text strong {
+                color: var(--accent);
+                font-weight: 700;
+            }
+
+            .amina-after .stat {
+                font-family: var(--serif);
+                font-size: 100px;
+                font-weight: 900;
+                color: var(--accent);
+                line-height: 1;
+                letter-spacing: -0.02em;
+            }
+
+            .amina-after .stat .pct {
+                font-size: 64px;
+            }
+            .amina-after .stat-lab {
+                display: block;
+                font-family: var(--mono);
+                font-size: 16px;
+                color: var(--muted);
+                letter-spacing: 0.2em;
+                margin-top: 10px;
+            }
+
+            /* ============ SLIDE 8 — WAYMO RESPONSE ============ */
+            .response-quote {
+                background: var(--paper-dim);
+                padding: 56px 72px;
+                margin-bottom: 48px;
+                border-left: 6px solid var(--accent);
+                position: relative;
+            }
+
+            .response-quote .label {
+                font-family: var(--mono);
+                font-size: 16px;
+                color: var(--accent);
+                letter-spacing: 0.25em;
+                margin-bottom: 18px;
+                text-transform: uppercase;
+                font-weight: 600;
+            }
+
+            .response-quote .text {
+                font-family: var(--serif);
+                font-size: 38px;
+                line-height: 1.5;
+                color: var(--ink);
+                font-weight: 600;
+            }
+
+            .response-quote .attr {
+                margin-top: 20px;
+                font-family: var(--sans);
+                font-size: 22px;
+                color: var(--muted);
+            }
+
+            .response-context {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 56px;
+                margin-bottom: 32px;
+            }
+
+            .response-context .col h3 {
+                font-family: var(--mono);
+                font-size: 17px;
+                letter-spacing: 0.25em;
+                color: var(--ink);
+                text-transform: uppercase;
+                padding-bottom: 12px;
+                border-bottom: 2px solid var(--ink);
+                margin-bottom: 18px;
+                font-weight: 600;
+            }
+
+            .response-context .col p {
+                font-family: var(--serif);
+                font-size: 28px;
+                line-height: 1.6;
+                color: var(--ink-soft);
+                font-weight: 500;
+            }
+
+            .response-context .col p strong {
+                color: var(--accent);
+                font-weight: 700;
+            }
+
+            /* ============ SLIDE 9 — CONTEXT ============ */
+            .context-row {
+                display: grid;
+                grid-template-columns: 1fr 1.4fr;
+                gap: 96px;
+                flex: 1;
+            }
+
+            .context-col h3 {
+                font-family: var(--serif);
+                font-size: 36px;
+                font-weight: 600;
+                color: var(--ink);
+                margin-bottom: 32px;
+                padding-bottom: 12px;
+                border-bottom: 2px solid var(--ink);
+            }
+
+            .stats-stack {
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            }
+
+            .stat-row {
+                display: flex;
+                align-items: baseline;
+                gap: 24px;
+                padding-bottom: 20px;
+                border-bottom: 1px dotted var(--rule);
+            }
+
+            .stat-row .num {
+                font-family: var(--serif);
+                font-size: 64px;
+                font-weight: 900;
+                color: var(--accent);
+                line-height: 1;
+                letter-spacing: -0.02em;
+                width: 200px;
+                flex-shrink: 0;
+            }
+
+            .stat-row .lab {
+                font-family: var(--sans);
+                font-size: 24px;
+                color: var(--ink-soft);
+                line-height: 1.5;
+                font-weight: 500;
+            }
+
+            .stat-row .lab em {
+                color: var(--accent);
+                font-style: normal;
+                font-weight: 700;
+            }
+
+            .chrono {
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                position: relative;
+            }
+
+            .chrono::before {
+                content: "";
+                position: absolute;
+                left: 138px;
+                top: 18px;
+                bottom: 14px;
+                width: 1px;
+                background: var(--rule);
+            }
+
+            .chrono-row {
+                display: flex;
+                align-items: center;
+                gap: 24px;
+                padding: 8px 0;
+            }
+
+            .chrono-row.this {
+                background: var(--ink);
+                color: var(--paper);
+                margin: 6px -16px;
+                padding: 18px 16px;
+                border-left: 5px solid var(--signal);
+                z-index: 2;
+                position: relative;
+            }
+
+            .chrono-row.this .date {
+                color: var(--signal);
+                font-weight: 700;
+            }
+            .chrono-row.this .ev {
+                color: var(--paper);
+                font-weight: 600;
+            }
+            .chrono-row.this .dot {
+                background: var(--signal);
+                width: 12px;
+                height: 12px;
+            }
+
+            .chrono .date {
+                font-family: var(--mono);
+                font-size: 22px;
+                color: var(--accent);
+                font-weight: 600;
+                width: 110px;
+                flex-shrink: 0;
+            }
+
+            .chrono .dot {
+                width: 9px;
+                height: 9px;
+                border-radius: 50%;
+                background: var(--accent);
+                flex-shrink: 0;
+            }
+
+            .chrono .ev {
+                font-family: var(--serif);
+                font-size: 26px;
+                color: var(--ink);
+                line-height: 1.4;
+                font-weight: 500;
+            }
+
+            /* ============ SLIDE 10 — MRC ============ */
+            .mrc-stack {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                flex: 1;
+                justify-content: center;
+                gap: 36px;
+            }
+
+            .mrc-def {
+                background: var(--paper-dim);
+                padding: 32px 56px;
+                text-align: center;
+                max-width: 1200px;
+                border: 1px solid var(--rule);
+            }
+
+            .mrc-def .lab {
+                font-family: var(--mono);
+                font-size: 17px;
+                color: var(--accent);
+                letter-spacing: 0.25em;
+                text-transform: uppercase;
+                margin-bottom: 14px;
+                font-weight: 600;
+            }
+
+            .mrc-def .text {
+                font-family: var(--serif);
+                font-size: 32px;
+                color: var(--ink);
+                line-height: 1.55;
+                font-weight: 600;
+            }
+
+            .mrc-def .text em {
+                color: var(--accent);
+                font-style: normal;
+                font-weight: 800;
+            }
+
+            .tension-diagram {
+                display: flex;
+                align-items: center;
+                gap: 56px;
+                padding: 24px 0;
+            }
+
+            .tension-side {
+                text-align: center;
+                flex: 1;
+            }
+
+            .tension-side .label {
+                font-family: var(--serif);
+                font-size: 36px;
+                font-weight: 800;
+                color: var(--ink);
+                margin-bottom: 12px;
+                line-height: 1.3;
+            }
+
+            .tension-side .desc {
+                font-family: var(--sans);
+                font-size: 24px;
+                color: var(--muted);
+                line-height: 1.5;
+                font-weight: 500;
+            }
+
+            .tension-vs {
+                font-family: var(--serif);
+                font-size: 42px;
+                color: var(--accent);
+                font-weight: 600;
+                flex-shrink: 0;
+            }
+
+            .koop {
+                background: var(--ink);
+                color: var(--paper);
+                padding: 36px 64px;
+                border-left: 6px solid var(--signal);
+                max-width: 1400px;
+            }
+
+            .koop .text {
+                font-family: var(--serif);
+                font-size: 34px;
+                line-height: 1.55;
+                font-weight: 500;
+            }
+
+            .koop .text strong {
+                color: var(--signal);
+                font-weight: 800;
+            }
+
+            .koop .attr {
+                margin-top: 16px;
+                font-family: var(--mono);
+                font-size: 17px;
+                color: rgba(239, 233, 218, 0.65);
+                letter-spacing: 0.15em;
+            }
+
+            /* ============ SLIDE 11 — CLOSING ============ */
+            .close-frame {
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+                justify-content: flex-start;
+                gap: 32px;
+                padding: 8px 0 0;
+            }
+
+            .close-thought {
+                font-family: var(--serif);
+                font-size: 36px;
+                line-height: 1.55;
+                color: var(--ink);
+                font-weight: 500;
+                max-width: 1600px;
+            }
+
+            .close-thought p {
+                margin-bottom: 18px;
+            }
+            .close-thought p:last-child {
+                margin-bottom: 0;
+            }
+            .close-thought .em {
+                color: var(--accent);
+                font-weight: 800;
+            }
+
+            .close-question {
+                background: var(--paper-dim);
+                padding: 36px 56px;
+                border-left: 6px solid var(--ink);
+                max-width: 1400px;
+            }
+
+            .close-question .lab {
+                font-family: var(--mono);
+                font-size: 17px;
+                letter-spacing: 0.25em;
+                color: var(--accent);
+                text-transform: uppercase;
+                margin-bottom: 14px;
+                font-weight: 600;
+            }
+
+            .close-question .q {
+                font-family: var(--serif);
+                font-size: 32px;
+                line-height: 1.5;
+                color: var(--ink);
+                font-weight: 700;
+            }
+
+            .thank-you {
+                margin-top: 8px;
+                text-align: right;
+                font-family: var(--serif);
+                font-size: 28px;
+                color: var(--muted);
+                font-weight: 500;
+            }
+
+            /* ============ SLIDE — VIDEO ============ */
+            .video-stage {
+                display: grid;
+                grid-template-columns: 480px 1fr;
+                gap: 72px;
+                align-items: center;
+                flex: 1;
+                min-height: 0;
+            }
+
+            .video-frame {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+            }
+
+            .incident-video {
+                height: 720px;
+                max-height: 100%;
+                width: auto;
+                max-width: 100%;
+                background: #000;
+                border-radius: 10px;
+                box-shadow: 0 30px 80px rgba(0, 0, 0, 0.22);
+                display: block;
+            }
+
+            .video-context {
+                display: flex;
+                flex-direction: column;
+                gap: 36px;
+            }
+
+            .video-context h3 {
+                font-family: var(--serif);
+                font-size: 52px;
+                font-weight: 800;
+                color: var(--ink);
+                line-height: 1.2;
+                letter-spacing: -0.01em;
+            }
+
+            .video-context h3 .accent {
+                color: var(--accent);
+            }
+
+            .vc-meta {
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+                border-top: 3px solid var(--ink);
+                border-bottom: 1px solid var(--rule);
+                padding: 26px 0;
+            }
+
+            .vc-row {
+                display: grid;
+                grid-template-columns: 130px 1fr;
+                gap: 28px;
+                align-items: baseline;
+            }
+
+            .vc-row .lab {
+                font-family: var(--mono);
+                font-size: 18px;
+                letter-spacing: 0.22em;
+                color: var(--accent);
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+
+            .vc-row .val {
+                font-family: var(--serif);
+                font-size: 28px;
+                color: var(--ink);
+                line-height: 1.45;
+                font-weight: 600;
+            }
+
+            .vc-note {
+                font-family: var(--serif);
+                font-size: 30px;
+                line-height: 1.55;
+                color: var(--ink-soft);
+                font-weight: 500;
+            }
+
+            .vc-note strong {
+                color: var(--accent);
+                font-weight: 800;
+            }
+
+            /* === HINT === */
+            .hint {
+                position: fixed;
+                bottom: 20px;
+                right: 24px;
+                font-family: var(--mono);
+                font-size: 12px;
+                color: rgba(239, 233, 218, 0.4);
+                z-index: 100;
+                pointer-events: none;
+                letter-spacing: 0.1em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="stage" id="stage">
+            <!-- ============ SLIDE 1 — COVER ============ -->
+            <section class="slide cover active" data-num="01">
+                <div class="cover-hero">
+                    <div class="cover-grid-bg"></div>
+
+                    <svg
+                        class="cover-svg"
+                        viewBox="0 0 200 200"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <g stroke="#b03028" stroke-width="1.2" fill="none">
+                            <circle cx="100" cy="100" r="92" opacity="0.1" />
+                            <circle cx="100" cy="100" r="74" opacity="0.18" />
+                            <circle cx="100" cy="100" r="56" opacity="0.3" />
+                        </g>
+                        <g fill="#efe9da">
+                            <rect
+                                x="78"
+                                y="58"
+                                width="44"
+                                height="86"
+                                rx="10"
+                            />
+                        </g>
+                        <g fill="#161410">
+                            <rect x="83" y="68" width="34" height="22" rx="2" />
+                            <rect
+                                x="83"
+                                y="115"
+                                width="34"
+                                height="22"
+                                rx="2"
+                            />
+                        </g>
+                        <circle cx="100" cy="100" r="7" fill="#b03028" />
+                        <circle cx="100" cy="100" r="3" fill="#c79121" />
+                        <g fill="#c79121">
+                            <circle cx="100" cy="32" r="6" />
+                            <rect x="95" y="38" width="10" height="16" rx="2" />
+                        </g>
+                        <g
+                            stroke="#b03028"
+                            stroke-width="2.5"
+                            stroke-dasharray="3 4"
+                            fill="none"
+                        >
+                            <path d="M 100 56 L 100 46" />
+                        </g>
+                    </svg>
+
+                    <div class="cover-content">
+                        <div class="cover-top">
+                            <div>AI INCIDENT DATABASE — CASE #854</div>
+                            <div class="right">
+                                <span class="label">FILED</span>
+                                OECD AIM 2024-09-28-13b3
+                            </div>
+                        </div>
+
+                        <div class="cover-main">
+                            <h1>
+                                當 AI<br />選擇<span class="stop">停下來</span>
+                            </h1>
+                            <p class="cover-sub">
+                                一輛無人駕駛計程車停在路口，拒絕前進。<br />
+                                它依規格運作。<strong
+                                    >車內的女性，因此被困在街頭。</strong
+                                >
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cover-info">
+                    <div class="col">
+                        <span class="lab">CASE</span>
+                        <span class="val"
+                            >Waymo ／ San Francisco ／ 2024.09.28</span
+                        >
+                    </div>
+                    <div class="col" style="text-align: right">
+                        <span class="lab">PRESENTER</span>
+                        <span class="val placeholder"
+                            >［ 陳鉑琁 ／ 網路安全實務與社會 ／ 2026/05/04
+                            ］</span
+                        >
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 2 — DATE OPENER ============ -->
+            <section class="slide" data-num="02">
+                <div class="head-strip">
+                    <div class="case-id">事件概要</div>
+                    <div class="pager">SLIDE <span>02</span> / 12</div>
+                </div>
+
+                <p class="kicker">事情就發生在那麼一個尋常的早上。</p>
+                <h1 class="date-display">
+                    <span class="yr">2024.09.28</span>
+                    <span class="sep">／</span>
+                    <span class="time">10:00 AM</span>
+                </h1>
+                <p class="date-place">舊金山，Mission 街與第九街口。</p>
+
+                <div class="scene-facts">
+                    <div class="fact">
+                        <div class="lab">地點</div>
+                        <div class="val">Mission × Ninth</div>
+                        <div class="det">
+                            SoMa 與田德隆區的邊界，週六上午的繁忙路段。
+                        </div>
+                    </div>
+                    <div class="fact">
+                        <div class="lab">車輛</div>
+                        <div class="val">Waymo One</div>
+                        <div class="det">
+                            第五代 Jaguar I-PACE 全電動 SUV，搭載 Waymo Driver
+                            自駕系統。
+                        </div>
+                    </div>
+                    <div class="fact">
+                        <div class="lab">乘客</div>
+                        <div class="val">Amina Green</div>
+                        <div class="det">
+                            28
+                            歲，舊金山在地的數據科學家，因童年車禍習慣不自行開車。
+                        </div>
+                    </div>
+                </div>
+
+                <p class="scene-coda">
+                    事件全程沒有碰撞、沒有財損、沒有人受傷——<br />
+                    <strong>但它仍被收錄為 AI 事故第 854 號。</strong>
+                </p>
+            </section>
+
+            <!-- ============ SLIDE 3 — TIMELINE 1 ============ -->
+            <section class="slide" data-num="03">
+                <div class="head-strip">
+                    <div class="case-id">事件時序（一）</div>
+                    <div class="pager">SLIDE <span>03</span> / 12</div>
+                </div>
+
+                <h2 class="title">綠燈亮起，<em>車子卻不動。</em></h2>
+
+                <div class="timeline-flow">
+                    <div class="tl-item">
+                        <div class="tl-time">T+0 秒</div>
+                        <div class="tl-mark"></div>
+                        <div class="tl-text">
+                            紅燈亮起，車輛正常停下，Amina 坐在後座。
+                            <span class="note">這是一趟再普通不過的行程。</span>
+                        </div>
+                    </div>
+                    <div class="tl-item">
+                        <div class="tl-time">T+30 秒</div>
+                        <div class="tl-mark"></div>
+                        <div class="tl-text">
+                            一名穿紅色連帽衫、戴禮帽的男子，走到車頭正前方站定。
+                            <span class="note"
+                                >他的位置正好擋在車輛的前進路徑上。</span
+                            >
+                        </div>
+                    </div>
+                    <div class="tl-item">
+                        <div class="tl-time">T+1 分鐘</div>
+                        <div class="tl-mark"></div>
+                        <div class="tl-text">
+                            燈號轉綠。車輛仍然靜止——Waymo Driver
+                            偵測到行人，依設計拒絕前進。
+                            <span class="note"
+                                >「最小風險狀態」啟動：對自駕系統而言，停下來就是答案。</span
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pullquote">
+                    <div class="qmark">「</div>
+                    <div class="text">
+                        我的 Waymo 在 Tenderloin
+                        被人「劫持」了，他們說在我給出電話號碼之前不讓我離開……不知道該不該上傳影片。
+                    </div>
+                    <div class="attr">
+                        @Amina_io ／ 2024.09.28 ／ 首則 X 貼文
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 4 — ESCALATION ============ -->
+            <section class="slide" data-num="04">
+                <div class="head-strip">
+                    <div class="case-id">事件時序（二）</div>
+                    <div class="pager">SLIDE <span>04</span> / 12</div>
+                </div>
+
+                <h2 class="title">另一個男人，<em>也走了過來。</em></h2>
+
+                <div class="prose-block">
+                    <p>
+                        第二名男子身穿深色外套、戴白色毛帽，從另一側走來，與紅帽男子合圍車輛。兩人隔著車窗，反覆要求
+                        Amina 給出電話號碼，並做出比手機通話的手勢。
+                    </p>
+                    <p>
+                        Amina
+                        在後續貼文中提到一個讓她特別不安的細節：當下她還看到附近<span
+                            class="em"
+                            >有人手裡拿著噴燈走過</span
+                        >。她不知道接下來還會出現什麼。
+                    </p>
+                    <p>
+                        騷擾持續了<strong>數分鐘</strong>。車輛全程沒有移動，最終兩名男子自行離去。
+                    </p>
+                </div>
+
+                <div class="pullquote">
+                    <div class="qmark">「</div>
+                    <div class="text">
+                        Get out of the way! Stop, you're holding up traffic!
+                        <strong>No! Get out! Move!</strong>
+                    </div>
+                    <div class="attr">
+                        乘客 Amina ／ 影片中重複喊話 ／ 車輛無回應
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 5 — INCIDENT VIDEO ============ -->
+            <section class="slide" data-num="05">
+                <div class="head-strip">
+                    <div class="case-id">影片紀錄</div>
+                    <div class="pager">SLIDE <span>05</span> / 12</div>
+                </div>
+
+                <h2 class="title" style="font-size: 64px; margin-bottom: 24px">
+                    事件當下，<em>真實畫面。</em>
+                </h2>
+
+                <div class="video-stage">
+                    <div class="video-frame">
+                        <video
+                            class="incident-video"
+                            controls
+                            preload="metadata"
+                            playsinline
+                            src="incident-video.mp4"
+                        >
+                            您的瀏覽器不支援 HTML5 影片播放。
+                        </video>
+                    </div>
+
+                    <div class="video-context">
+                        <h3>
+                            Amina 拍下的<span class="accent">第一手紀錄</span>。
+                        </h3>
+
+                        <div class="vc-meta">
+                            <div class="vc-row">
+                                <div class="lab">來源</div>
+                                <div class="val">
+                                    @Amina_io ／ X 平台公開貼文
+                                </div>
+                            </div>
+                            <div class="vc-row">
+                                <div class="lab">時長</div>
+                                <div class="val">約 58 秒</div>
+                            </div>
+                            <div class="vc-row">
+                                <div class="lab">內容</div>
+                                <div class="val">
+                                    兩名男子站在車前，乘客多次喊話、車輛全程靜止。
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="vc-note">
+                            影片中可清楚聽見 Amina 反覆要求兩名男子讓開——
+                            <strong
+                                >但 Waymo
+                                沒有任何車外回應：沒有鳴笛、沒有對外語音、也沒有警示燈。</strong
+                            >
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 6 — CAR DID ============ -->
+            <section class="slide" data-num="06">
+                <div class="head-strip">
+                    <div class="case-id">車輛行為（一）</div>
+                    <div class="pager">SLIDE <span>06</span> / 12</div>
+                </div>
+
+                <h2 class="title">Waymo Driver <em>做了什麼？</em></h2>
+
+                <div class="car-did">
+                    <div class="screen-mock">
+                        <div class="pulse"></div>
+                        <div class="msg">"We will help<br />you shortly."</div>
+                        <div class="sub">RIDER SUPPORT — CONNECTING</div>
+                    </div>
+
+                    <div class="action-list">
+                        <div class="action-row">
+                            <div class="check">✓</div>
+                            <div class="text">
+                                偵測到行人後立即停止——<strong
+                                    >完全符合 SAE J3016 Level 4
+                                    設計規範。</strong
+                                >
+                            </div>
+                        </div>
+                        <div class="action-row">
+                            <div class="check">✓</div>
+                            <div class="text">
+                                車內螢幕主動顯示客服訊息，乘客知道有人正在處理。
+                            </div>
+                        </div>
+                        <div class="action-row">
+                            <div class="check">✓</div>
+                            <div class="text">
+                                Rider Support 全程通話線上聯繫（Amina
+                                事後高度肯定客服表現）。
+                            </div>
+                        </div>
+                        <div class="action-row">
+                            <div class="check">✓</div>
+                            <div class="text">
+                                車內介面提供「直接連線警方」選項，由乘客自主決定是否啟用。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 7 — CAR DIDN'T ============ -->
+            <section class="slide" data-num="07">
+                <div class="head-strip">
+                    <div class="case-id">車輛行為（二）</div>
+                    <div class="pager">SLIDE <span>07</span> / 12</div>
+                </div>
+
+                <h2 class="title">但有些事，<em>車輛沒有做。</em></h2>
+
+                <div class="didnt-list">
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">沒有鳴笛或音頻警告騷擾者</div>
+                    </div>
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">沒有自動向警方通報</div>
+                    </div>
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">沒有嘗試低速繞行或退後</div>
+                    </div>
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">沒有自動鎖門</div>
+                    </div>
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">沒有觸發車外緊急警報燈</div>
+                    </div>
+                    <div class="didnt-row">
+                        <div class="x">✕</div>
+                        <div class="text">
+                            沒有播放「請離開車輛前方」的對外語音
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bottom-quote">
+                    車輛<span class="accent">完全按設計運作</span
+                    >——<br />而設計，沒有為此刻準備好。
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 8 — AMINA VOICE ============ -->
+            <section class="slide" data-num="08">
+                <div class="head-strip">
+                    <div class="case-id">乘客視角</div>
+                    <div class="pager">SLIDE <span>08</span> / 12</div>
+                </div>
+
+                <h2 class="title" style="margin-bottom: 32px">
+                    Amina <em>的聲音。</em>
+                </h2>
+
+                <div class="amina-pull">
+                    <div class="siren">🚨 舊金山女性警示 🚨</div>
+                    <div class="text">
+                        我愛
+                        Waymo，但這次真的很嚇人。兩名男子擋在車前，要我給號碼，車子卡在街上動不了。幸好只持續了幾分鐘——女性朋友請小心。
+                    </div>
+                    <div class="attr">
+                        @Amina_io ／ 2024.09.30 ／ 病毒影片貼文
+                    </div>
+                </div>
+
+                <div class="amina-after">
+                    <div class="text">
+                        她在 2025 年 12 月於《Business
+                        Insider》自述全文，公開真實姓名為 Amina
+                        Green。她沒有刪除應用程式——但<strong
+                            >建議 Waymo 加入避開 Tenderloin
+                            的路線、自動鎖門、車內緊急警報。</strong
+                        >到今天，這些功能都還沒上線。
+                    </div>
+                    <div>
+                        <div class="stat">~50<span class="pct">%</span></div>
+                        <div class="stat-lab">事件後仍使用 Waymo 的比例</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 9 — WAYMO RESPONSE ============ -->
+            <section class="slide" data-num="09">
+                <div class="head-strip">
+                    <div class="case-id">企業回應</div>
+                    <div class="pager">SLIDE <span>09</span> / 12</div>
+                </div>
+
+                <h2 class="title">Waymo <em>怎麼說？</em></h2>
+
+                <div class="response-quote">
+                    <div class="label">官方聲明</div>
+                    <div class="text">
+                        「您的安全始終是我們的首要任務。此類事件在我們每週超過
+                        10 萬次的乘車服務中極為罕見。」
+                    </div>
+                    <div class="attr">— Julia Ilina，Waymo 發言人</div>
+                </div>
+
+                <div class="response-context">
+                    <div class="col">
+                        <h3>已知的處理</h3>
+                        <p>
+                            Rider Support 主動聯繫，全程通話線上。<br />@Waymo
+                            官方帳號公開回覆 Amina 的貼文。<br />媒體應詢時釋出標準聲明。
+                        </p>
+                    </div>
+                    <div class="col">
+                        <h3>仍未公開的部分</h3>
+                        <p>
+                            是否因本事件<strong>更新軟體？</strong>是否將車載感測器影片<strong
+                                >提供 SFPD？</strong
+                            >兩名男子是否被<strong>識別？</strong>
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 10 — CONTEXT ============ -->
+            <section class="slide" data-num="10">
+                <div class="head-strip">
+                    <div class="case-id">脈絡背景</div>
+                    <div class="pager">SLIDE <span>10</span> / 12</div>
+                </div>
+
+                <h2 class="title" style="margin-bottom: 36px">
+                    這不是<em>孤立事件。</em>
+                </h2>
+
+                <div class="context-row">
+                    <div class="context-col">
+                        <h3>關於 Waymo</h3>
+                        <div class="stats-stack">
+                            <div class="stat-row">
+                                <div class="num">$45B</div>
+                                <div class="lab">
+                                    2024 年 C 輪估值<br />Alphabet 旗下子公司
+                                </div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="num">500K</div>
+                                <div class="lab">每週乘車次數（2026.03）</div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="num">200M</div>
+                                <div class="lab">累計全自動行駛英里</div>
+                            </div>
+                            <div class="stat-row">
+                                <div class="num">
+                                    85<span style="font-size: 36px">%</span>
+                                </div>
+                                <div class="lab">
+                                    官方稱致傷碰撞率較人類駕駛低<br /><em
+                                        >——但僅限「碰撞型」事件。</em
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="context-col">
+                        <h3>舊金山的 AV 衝突年表</h3>
+                        <div class="chrono">
+                            <div class="chrono-row">
+                                <div class="date">2023.10</div>
+                                <div class="dot"></div>
+                                <div class="ev">
+                                    Cruise 拖行行人事件 → DMV 撤照
+                                </div>
+                            </div>
+                            <div class="chrono-row">
+                                <div class="date">2024.02</div>
+                                <div class="dot"></div>
+                                <div class="ev">唐人街 Waymo 春節遭縱火</div>
+                            </div>
+                            <div class="chrono-row">
+                                <div class="date">2024.05</div>
+                                <div class="dot"></div>
+                                <div class="ev">
+                                    NHTSA 開啟 PE24016 聯邦調查
+                                </div>
+                            </div>
+                            <div class="chrono-row">
+                                <div class="date">2024.09.21</div>
+                                <div class="dot"></div>
+                                <div class="ev">
+                                    Mission 區塗鴉潮（AIID #853，姊妹事件）
+                                </div>
+                            </div>
+                            <div class="chrono-row this">
+                                <div class="date">2024.09.28</div>
+                                <div class="dot"></div>
+                                <div class="ev">本事件 — AIID #854</div>
+                            </div>
+                            <div class="chrono-row">
+                                <div class="date">2025.12</div>
+                                <div class="dot"></div>
+                                <div class="ev">
+                                    PG&E 停電 — 數百輛 Waymo 集體凍結
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 11 — MRC PARADOX ============ -->
+            <section class="slide" data-num="11">
+                <div class="head-strip">
+                    <div class="case-id">核心矛盾</div>
+                    <div class="pager">SLIDE <span>11</span> / 12</div>
+                </div>
+
+                <h2 class="title" style="font-size: 64px; margin-bottom: 24px">
+                    停下來，<em>是設計，也是傷害。</em>
+                </h2>
+
+                <div class="mrc-stack">
+                    <div class="mrc-def">
+                        <div class="lab">
+                            SAE J3016 — Minimal Risk Condition
+                        </div>
+                        <div class="text">
+                            當系統遭遇無法安全解決的情況時，應「停在原地等待」。<br />
+                            <em>傳統假設：停止 ＝ 最安全。</em>
+                        </div>
+                    </div>
+
+                    <div class="tension-diagram">
+                        <div class="tension-side">
+                            <div class="label">防碰撞安全</div>
+                            <div class="desc">
+                                系統不撞到任何行人——這是車的設計核心。
+                            </div>
+                        </div>
+                        <div class="tension-vs">⇄</div>
+                        <div class="tension-side">
+                            <div class="label">乘客人身安全</div>
+                            <div class="desc">
+                                乘客不被困在威脅情境裡——這項，被忽略了。
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="koop">
+                        <div class="text">
+                            「停在原地等於最小風險」這個假設，在都市複雜情境中，是一種<strong>反覆出現的失效模式</strong>。
+                        </div>
+                        <div class="attr">
+                            — PHILIP KOOPMAN ／ CARNEGIE MELLON UNIVERSITY ／
+                            ARXIV:2402.06046
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ SLIDE 12 — CLOSING ============ -->
+            <section class="slide" data-num="12">
+                <div class="head-strip">
+                    <div class="case-id">收尾</div>
+                    <div class="pager">SLIDE <span>12</span> / 12</div>
+                </div>
+
+                <h2 class="title">那麼，我們<em>從這件事看到了什麼？</em></h2>
+
+                <div class="close-frame">
+                    <div class="close-thought">
+                        <p>
+                            Waymo 的車輛沒有撞人、沒有讓乘客受傷、Rider Support
+                            全程在線——這些都是真的。
+                        </p>
+                        <p>
+                            但它也<span class="em"
+                                >把一名女性留在路口，面對騷擾無能為力</span
+                            >。而這份無能為力，是被刻意設計進去的安全邏輯所產生的副產品。
+                        </p>
+                        <p>
+                            第 854
+                            號事件的價值，不在於它有多嚴重——它揭示的是一類難以被傳統指標衡量、卻真實影響真實人的<span
+                                class="em"
+                                >系統失效模式</span
+                            >。
+                        </p>
+                    </div>
+
+                    <div class="close-question">
+                        <div class="lab">留給課堂討論的一個問題</div>
+                        <div class="q">
+                            「自動駕駛比人類駕駛更安全」——這個命題，在邊緣群體的日常體驗中，是否同樣成立？
+                        </div>
+                    </div>
+
+                    <div class="thank-you">— 謝謝聆聽 ／ Q&A —</div>
+                </div>
+            </section>
+        </div>
+
+        <div class="hint">← →切換　F 全螢幕</div>
+
+        <script>
+            const stage = document.getElementById("stage");
+            const slides = document.querySelectorAll(".slide");
+            const total = slides.length;
+            let cur = 0;
+
+            function fit() {
+                const sw = window.innerWidth / 1920;
+                const sh = window.innerHeight / 1080;
+                const s = Math.min(sw, sh);
+                document.documentElement.style.setProperty("--s", s);
+            }
+
+            function show(i) {
+                slides.forEach((s) => s.classList.remove("active"));
+                slides[i].classList.add("active");
+                cur = i;
+            }
+
+            window.addEventListener("resize", fit);
+            fit();
+
+            document.addEventListener("keydown", (e) => {
+                if (
+                    e.key === "ArrowRight" ||
+                    e.key === " " ||
+                    e.key === "PageDown"
+                ) {
+                    e.preventDefault();
+                    if (cur < total - 1) show(cur + 1);
+                } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+                    e.preventDefault();
+                    if (cur > 0) show(cur - 1);
+                } else if (e.key === "Home") {
+                    show(0);
+                } else if (e.key === "End") {
+                    show(total - 1);
+                } else if (e.key === "f" || e.key === "F") {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                }
+            });
+
+            document.addEventListener("click", (e) => {
+                if (e.target.closest("a, button")) return;
+                const x = e.clientX;
+                const w = window.innerWidth;
+                if (x > w / 2) {
+                    if (cur < total - 1) show(cur + 1);
+                } else {
+                    if (cur > 0) show(cur - 1);
+                }
+            });
+
+            show(0);
+        </script>
+    </body>
+</html>
